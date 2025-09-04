@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.29;
 
 import { IERC20 } from"./interfaces/IERC20.sol";
 import { Events } from "./lib/events.sol";
@@ -88,5 +89,72 @@ contract TokenContract is IERC20 {
       require(reciever != address(0), "Invalid address zero detected");
 
       balances[reciever] += amount;
+    }
+}
+
+    
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.28;
+
+import { IERC20 } from "./interfaces/IERC20.sol";
+import { Events } from "./lib/events.sol";
+
+contract Savings {
+    IERC20 public token;
+    
+    mapping(address => uint256) public ethSavings;
+    mapping(address => uint256) public tokenSavings;
+
+    constructor() {
+        token = IERC20(address(new TokenContract("Savings Token", "SVT")));
+    }
+
+    function saveEth() public payable {
+        require(msg.value > 0, "Value should not be zero");
+        ethSavings[msg.sender] += msg.value;
+        emit Events.SavedETH(msg.sender, msg.value);
+    }
+
+    function saveToken(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        require(token.balanceOf(msg.sender) >= amount, "Insufficient tokens");
+
+        require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        tokenSavings[msg.sender] += amount;
+        emit Events.SavedTokens(msg.sender, amount);
+    }
+
+    function withdrawEth(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        require(ethSavings[msg.sender] >= amount, "Insufficient ETH savings");
+        
+        ethSavings[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+        emit Events.WithdrewETH(msg.sender, amount);
+    }
+
+    function withdrawToken(uint256 amount) public {
+        require(amount > 0, "Amount must be greater than zero");
+        require(tokenSavings[msg.sender] >= amount, "Insufficient token savings");
+        
+        tokenSavings[msg.sender] -= amount;
+        require(token.transfer(msg.sender, amount), "Token transfer failed");
+        emit Events.WithdrewTokens(msg.sender, amount);
+    }
+
+    function getSavings(address user) public view returns (uint256 ethAmount, uint256 tokenAmount) {
+        return (ethSavings[user], tokenSavings[user]);
+    }
+
+    function getTokenBalance(address user) public view returns (uint256) {
+        return token.balanceOf(user);
+    }
+
+    function getContractTokenBalance() public view returns (uint256) {
+        return token.balanceOf(address(this));
+    }
+
+    function getContractEthBalance() public view returns (uint256) {
+        return address(this).balance;
     }
 }
